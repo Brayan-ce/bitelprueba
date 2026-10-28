@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ProveedorDatos } from "@/_pages/components/datos/proveedor";
 import Shell from "@/_pages/components/layout/shell";
@@ -13,24 +13,40 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
 export const metadata = {
   title: {
-    default: "Inventario Pastrana · Bitel",
+    default: "Inventario Pastrana · Bitel y Claro",
     template: "%s · Inventario Pastrana",
   },
   description:
-    "Sistema de inventario de celulares Bitel Pastrana: control por IMEI, escaneo con cámara y movimientos entre tiendas.",
+    "Inventario de las tiendas Bitel y Claro de Pastrana S.A.C.: celulares por IMEI, accesorios, chips, escaneo con cámara y movimientos entre tiendas.",
+  applicationName: "Inventario Pastrana",
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f3ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0c0e" },
+  ],
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html
+      lang="es"
+      className={`${geistSans.variable} ${geistMono.variable} ${cormorant.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <script
           dangerouslySetInnerHTML={{

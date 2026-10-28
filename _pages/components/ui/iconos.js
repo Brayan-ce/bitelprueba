@@ -26,6 +26,17 @@ export function IconoCelular(props) {
   );
 }
 
+export function IconoInventario(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5v-9Z" />
+      <path d="M3.5 7.5 12 12l8.5-4.5" />
+      <path d="M12 12v9" />
+      <path d="M7.75 5.25 16.25 9.75" />
+    </svg>
+  );
+}
+
 export function IconoEscanear(props) {
   return (
     <svg {...base} {...props}>

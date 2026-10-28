@@ -8,6 +8,7 @@ import {
   IconoCelular,
   IconoEscanear,
   IconoInicio,
+  IconoInventario,
   IconoLuna,
   IconoMenu,
   IconoMovimientos,
@@ -20,6 +21,7 @@ import {
 
 const PRINCIPALES = [
   { href: "/", etiqueta: "Inicio", icono: IconoInicio },
+  { href: "/inventario", etiqueta: "Inventario", icono: IconoInventario },
   { href: "/celulares", etiqueta: "Celulares", icono: IconoCelular },
   { href: "/escanear", etiqueta: "Escanear", icono: IconoEscanear },
   { href: "/movimientos", etiqueta: "Movimientos", icono: IconoMovimientos },
@@ -31,13 +33,21 @@ const ADMINISTRACION = [
   { href: "/reportes", etiqueta: "Reportes", icono: IconoReportes },
 ];
 
-const TODO = [...PRINCIPALES, ...ADMINISTRACION];
-
 const INFERIOR = [
   { href: "/", etiqueta: "Inicio", icono: IconoInicio },
-  { href: "/celulares", etiqueta: "Celulares", icono: IconoCelular },
+  { href: "/inventario", etiqueta: "Inventario", icono: IconoInventario },
   { href: "/escanear", etiqueta: "Escanear", icono: IconoEscanear, especial: true },
   { href: "/movimientos", etiqueta: "Movimientos", icono: IconoMovimientos },
+];
+
+const SECCIONES = [
+  { href: "/inventario", etiqueta: "Inventario" },
+  { href: "/celulares", etiqueta: "Celulares" },
+  { href: "/escanear", etiqueta: "Escáner" },
+  { href: "/movimientos", etiqueta: "Movimientos" },
+  { href: "/tiendas", etiqueta: "Tiendas" },
+  { href: "/usuarios", etiqueta: "Usuarios" },
+  { href: "/reportes", etiqueta: "Reportes" },
 ];
 
 function activo(pathname, href) {
@@ -45,23 +55,18 @@ function activo(pathname, href) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function Marca() {
-  return (
-    <div className="marca">
-      <span className="marca-logo">b</span>
-      <span className="marca-texto">
-        bitel <span>inventario</span>
-        <span className="marca-sub">Pastrana · Huancavelica</span>
-      </span>
-    </div>
+function seccionActual(pathname) {
+  const encontrada = SECCIONES.find(
+    (seccion) => pathname === seccion.href || pathname.startsWith(`${seccion.href}/`)
   );
+  return encontrada ? encontrada.etiqueta : "Inicio";
 }
 
 function SelectorUsuario({ usuario, usuarios, onChange, id }) {
   return (
     <select
       id={id}
-      className="select header-usuario"
+      className="select"
       value={usuario}
       onChange={onChange}
       aria-label="Usuario activo"
@@ -99,6 +104,17 @@ export default function Shell({ children }) {
   }, []);
 
   useEffect(() => {
+    function alCambiarAlmacen(evento) {
+      if (evento.key !== "inventario:tema") return;
+      if (evento.newValue !== "claro" && evento.newValue !== "oscuro") return;
+      setTema(evento.newValue);
+      document.documentElement.setAttribute("data-tema", evento.newValue);
+    }
+    window.addEventListener("storage", alCambiarAlmacen);
+    return () => window.removeEventListener("storage", alCambiarAlmacen);
+  }, []);
+
+  useEffect(() => {
     setDrawer(false);
   }, [pathname]);
 
@@ -121,19 +137,17 @@ export default function Shell({ children }) {
     window.localStorage.setItem("inventario:usuario", valor);
   }
 
-  function cambiarTema() {
-    const siguiente = tema === "oscuro" ? "claro" : "oscuro";
+  function aplicarTema(siguiente) {
     setTema(siguiente);
     document.documentElement.setAttribute("data-tema", siguiente);
     try {
       window.localStorage.setItem("inventario:tema", siguiente);
     } catch {
-      setTema(siguiente);
+      /* sin almacenamiento: el tema igual se aplica en esta sesión */
     }
   }
 
-  const IconoTema = tema === "oscuro" ? IconoSol : IconoLuna;
-  const textoTema = tema === "oscuro" ? "Modo claro" : "Modo oscuro";
+  const inicial = usuario ? usuario.trim().charAt(0).toUpperCase() : "·";
 
   return (
     <div className="app">
@@ -147,25 +161,52 @@ export default function Shell({ children }) {
           <IconoMenu />
         </button>
 
-        <Link href="/" aria-label="Inicio">
-          <Marca />
+        <Link href="/" className="marca" aria-label="Pastrana · Inicio">
+          <span className="marca-texto">
+            <strong>Pastrana</strong>
+            <span className="marca-sub">Bitel y Claro</span>
+          </span>
         </Link>
+
+        <div className="migaja">
+          <span className="migaja-marca">Pastrana S.A.C.</span>
+          <span className="migaja-sep">/</span>
+          <span className="migaja-actual">{seccionActual(pathname)}</span>
+        </div>
 
         <div className="header-derecha">
           <div className="header-pc">
-            <SelectorUsuario
-              usuario={usuario}
-              usuarios={usuarios}
-              onChange={cambiarUsuario}
-            />
+            <div className="usuario-pill">
+              <span className="usuario-avatar" aria-hidden="true">
+                {inicial}
+              </span>
+              <SelectorUsuario
+                usuario={usuario}
+                usuarios={usuarios}
+                onChange={cambiarUsuario}
+              />
+            </div>
+          </div>
+          <div className="tema-toggle" role="group" aria-label="Tema de la interfaz">
             <button
               type="button"
-              className="icon-btn"
-              onClick={cambiarTema}
-              aria-label={textoTema}
-              title={textoTema}
+              className="tema-opcion tema-opcion-oscuro"
+              onClick={() => aplicarTema("oscuro")}
+              aria-pressed={tema === "oscuro"}
+              title="Modo oscuro"
             >
-              <IconoTema />
+              <IconoLuna />
+              <span>Oscuro</span>
+            </button>
+            <button
+              type="button"
+              className="tema-opcion tema-opcion-claro"
+              onClick={() => aplicarTema("claro")}
+              aria-pressed={tema === "claro"}
+              title="Modo claro"
+            >
+              <IconoSol />
+              <span>Claro</span>
             </button>
           </div>
         </div>
@@ -173,18 +214,28 @@ export default function Shell({ children }) {
 
       <div className="cuerpo">
         <aside className="sidebar" aria-label="Navegación lateral">
-          <p className="sidebar-titulo">Navegación</p>
+          <p className="sidebar-titulo">Principal</p>
           <nav className="nav-lista">
-            {TODO.map(({ href, etiqueta, icono: Icono }) => (
+            {PRINCIPALES.map(({ href, etiqueta, icono: Icono }) => (
               <Link key={href} href={href} className={activo(pathname, href) ? "activo" : ""}>
                 <Icono />
                 {etiqueta}
               </Link>
             ))}
           </nav>
+
+          <p className="sidebar-titulo">Administración</p>
+          <nav className="nav-lista">
+            {ADMINISTRACION.map(({ href, etiqueta, icono: Icono }) => (
+              <Link key={href} href={href} className={activo(pathname, href) ? "activo" : ""}>
+                <Icono />
+                {etiqueta}
+              </Link>
+            ))}
+          </nav>
+
           <div className="sidebar-pie">
-            Inventario Pastrana
-            <span>Datos de demostración</span>
+            <span>Pastrana S.A.C. · Bitel y Claro</span>
           </div>
         </aside>
 
@@ -273,12 +324,7 @@ export default function Shell({ children }) {
             </select>
           </div>
 
-          <button type="button" className="btn btn-secundario btn-block" onClick={cambiarTema}>
-            <IconoTema />
-            {textoTema}
-          </button>
-
-          <p className="texto-muted texto-chico">Inventario Pastrana · datos de demostración</p>
+          <p className="texto-muted texto-chico">Pastrana S.A.C. · Bitel y Claro</p>
         </div>
       </aside>
     </div>

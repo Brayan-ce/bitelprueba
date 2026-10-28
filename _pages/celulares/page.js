@@ -10,7 +10,7 @@ export default function CelularesPage() {
       <div className="encabezado-pagina">
         <div>
           <h1 className="titulo">Celulares</h1>
-          <p className="subtitulo">Inventario completo por tienda, estado e IMEI</p>
+          <p className="subtitulo">Equipos con IMEI por tienda, estado y operador</p>
         </div>
         <Link href="/celulares/nuevo" className="btn">
           <IconoMasNuevo />

@@ -13,13 +13,20 @@ export default function ListaCelulares() {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
   const [tienda, setTienda] = useState("");
+  const [operador, setOperador] = useState("");
   const [estado, setEstado] = useState("");
+
+  const operadorPorTienda = useMemo(
+    () => new Map(tiendas.map((t) => [t.nombre, t.operador])),
+    [tiendas]
+  );
 
   const filtrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
     const digitos = soloDigitos(busqueda);
     return celulares.filter((celular) => {
       if (tienda && celular.tienda !== tienda) return false;
+      if (operador && operadorPorTienda.get(celular.tienda) !== operador) return false;
       if (estado && celular.estado !== estado) return false;
       if (!texto) return true;
       const coincideTexto = [
@@ -38,7 +45,7 @@ export default function ListaCelulares() {
           (celular.imei2 && celular.imei2.includes(digitos)));
       return coincideTexto || coincideImei;
     });
-  }, [celulares, busqueda, tienda, estado]);
+  }, [celulares, busqueda, tienda, operador, estado, operadorPorTienda]);
 
   const totalCosto = filtrados.reduce((suma, c) => suma + (Number(c.costo) || 0), 0);
   const totalPrecio = filtrados.reduce((suma, c) => suma + (Number(c.precio_venta) || 0), 0);
@@ -115,6 +122,15 @@ export default function ListaCelulares() {
                 </option>
               ))}
             </select>
+            <select
+              className="select"
+              value={operador}
+              onChange={(e) => setOperador(e.target.value)}
+            >
+              <option value="">Todos los operadores</option>
+              <option value="Bitel">Bitel</option>
+              <option value="Claro">Claro</option>
+            </select>
             <select className="select" value={estado} onChange={(e) => setEstado(e.target.value)}>
               <option value="">Todos los estados</option>
               {ESTADOS.map((e) => (
@@ -178,16 +194,28 @@ export default function ListaCelulares() {
                     </Link>
                   </td>
                   <td>
-                    <strong>
-                      {celular.marca} {celular.modelo}
-                    </strong>
+                    <strong>{celular.modelo}</strong>
                     <div className="texto-muted texto-chico">
-                      {celular.memoria || "—"} · {celular.color || "—"}
+                      {[celular.marca, celular.memoria, celular.color].filter(Boolean).join(" · ")}
                     </div>
                   </td>
                   <td className="mono">{celular.imei1}</td>
                   <td className="mono">{celular.imei2 || "—"}</td>
-                  <td>{celular.tienda || "—"}</td>
+                  <td>
+                    <span className="tienda-celda">
+                      <span
+                        className={`punto-operador ${
+                          operadorPorTienda.get(celular.tienda) === "Bitel"
+                            ? "punto-bitel"
+                            : operadorPorTienda.get(celular.tienda) === "Claro"
+                              ? "punto-claro"
+                              : ""
+                        }`}
+                        title={operadorPorTienda.get(celular.tienda) || ""}
+                      />
+                      {celular.tienda || "—"}
+                    </span>
+                  </td>
                   <td>
                     <span className={claseEstado(celular.estado)}>{celular.estado}</span>
                   </td>

@@ -4,11 +4,13 @@ import { createContext, useContext, useState } from "react";
 import {
   CELULARES_DEMO,
   MOVIMIENTOS_DEMO,
+  PRODUCTOS_DEMO,
   TIENDAS_DEMO,
   USUARIOS_DEMO,
 } from "@/lib/datos-demo";
 import {
   ESTADOS,
+  OPERADORES,
   TIPOS_MOVIMIENTO,
   esImeiValido,
   extraerImei,
@@ -64,11 +66,37 @@ function aplicarMovimiento(celular, tipo, destino) {
   return { ...celular, tienda: destino };
 }
 
+function stockDeCelular(estado) {
+  return estado === "Vendido" || estado === "Baja" ? 0 : 1;
+}
+
 export function ProveedorDatos({ children }) {
   const [tiendas, setTiendas] = useState(TIENDAS_DEMO);
   const [usuarios, setUsuarios] = useState(USUARIOS_DEMO);
+  const [productos, setProductos] = useState(PRODUCTOS_DEMO);
   const [celulares, setCelulares] = useState(CELULARES_DEMO);
   const [movimientos, setMovimientos] = useState(MOVIMIENTOS_DEMO);
+
+  function crearProductoDeCelular(celular, id) {
+    const tienda = tiendas.find((t) => t.nombre === celular.tienda);
+    return {
+      id,
+      tiendaId: tienda ? tienda.id : "",
+      tienda: celular.tienda,
+      operador: tienda ? tienda.operador : "",
+      grupo: "Celulares",
+      categoria: "Celulares",
+      nombre: celular.modelo,
+      marca: celular.marca,
+      memoria: celular.memoria,
+      codigo: "",
+      imei: celular.imei1,
+      costo: Number(celular.costo) || 0,
+      precio: Number(celular.precio_venta) || 0,
+      stock: stockDeCelular(celular.estado),
+      stockMinimo: 0,
+    };
+  }
 
   function buscarPorImei(imei) {
     const valor = String(imei || "").trim();
@@ -102,7 +130,9 @@ export function ProveedorDatos({ children }) {
       return fallo(`El IMEI ${registro.imei2} ya está registrado.`);
 
     registro.creado_en = new Date().toISOString();
-    setCelulares((prev) => [...prev, registro]);
+    const productoId = `pc-${nuevoId()}`;
+    setProductos((prev) => [...prev, crearProductoDeCelular(registro, productoId)]);
+    setCelulares((prev) => [...prev, { ...registro, productoId }]);
     return { ok: true, codigo: registro.codigo };
   }
 
@@ -129,11 +159,23 @@ export function ProveedorDatos({ children }) {
         c.codigo === codigo ? { ...c, ...registro, creado_en: c.creado_en } : c
       )
     );
+    const actual = celulares.find((c) => c.codigo === codigo);
+    if (actual?.productoId) {
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === actual.productoId ? crearProductoDeCelular(registro, p.id) : p
+        )
+      );
+    }
     return { ok: true, codigo: registro.codigo };
   }
 
   function eliminarCelular(codigo) {
+    const objetivo = celulares.find((c) => c.codigo === codigo);
     setCelulares((prev) => prev.filter((c) => c.codigo !== codigo));
+    if (objetivo?.productoId) {
+      setProductos((prev) => prev.filter((p) => p.id !== objetivo.productoId));
+    }
     return { ok: true };
   }
 
@@ -187,41 +229,67 @@ export function ProveedorDatos({ children }) {
     };
 
     setMovimientos((prev) => [movimiento, ...prev]);
+    const despues = aplicarMovimiento(celular, tipo, tiendaDestino);
     setCelulares((prev) =>
-      prev.map((c) =>
-        c.codigo === celular.codigo ? aplicarMovimiento(c, tipo, tiendaDestino) : c
-      )
+      prev.map((c) => (c.codigo === celular.codigo ? despues : c))
     );
+    if (celular.productoId) {
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === celular.productoId ? crearProductoDeCelular(despues, p.id) : p
+        )
+      );
+    }
     return { ok: true, codigo: celular.codigo };
   }
 
   function agregarTienda(datos) {
     const nombre = String(datos.nombre || "").trim();
+    const operador = datos.operador || "Bitel";
     if (!nombre) return fallo("El nombre de la tienda es obligatorio.");
+    if (!OPERADORES.includes(operador)) return fallo("Selecciona el operador de la tienda.");
     if (tiendas.some((t) => t.nombre.toLowerCase() === nombre.toLowerCase()))
       return fallo(`Ya existe la tienda "${nombre}".`);
-    setTiendas((prev) => [...prev, { id: nuevoId(), nombre, activa: datos.activa !== false }]);
+    setTiendas((prev) => [
+      ...prev,
+      { id: nuevoId(), nombre, operador, ciudad: datos.ciudad || "", activa: datos.activa !== false },
+    ]);
     return { ok: true };
   }
 
   function actualizarTienda(id, datos) {
     const nombre = String(datos.nombre || "").trim();
+    const operador = datos.operador || "Bitel";
     if (!nombre) return fallo("El nombre de la tienda es obligatorio.");
+    if (!OPERADORES.includes(operador)) return fallo("Selecciona el operador de la tienda.");
     if (tiendas.some((t) => t.id !== id && t.nombre.toLowerCase() === nombre.toLowerCase()))
       return fallo(`Ya existe la tienda "${nombre}".`);
+    const anterior = tiendas.find((t) => t.id === id);
     setTiendas((prev) =>
       prev.map((t) =>
-        t.id === id ? { ...t, nombre, activa: datos.activa !== false } : t
+        t.id === id ? { ...t, nombre, operador, activa: datos.activa !== false } : t
       )
+    );
+    if (anterior && anterior.nombre !== nombre) {
+      setCelulares((prev) =>
+        prev.map((c) => (c.tienda === anterior.nombre ? { ...c, tienda: nombre } : c))
+      );
+    }
+    setProductos((prev) =>
+      prev.map((p) => (p.tiendaId === id ? { ...p, tienda: nombre, operador } : p))
     );
     return { ok: true };
   }
 
   function eliminarTienda(id) {
     const tienda = tiendas.find((t) => t.id === id);
-    const enUso = celulares.filter((c) => tienda && c.tienda === tienda.nombre);
+    if (!tienda) return fallo("La tienda no existe.");
+    const enUso = celulares.filter((c) => c.tienda === tienda.nombre);
     if (enUso.length)
       return fallo(`No se puede eliminar: hay ${enUso.length} celular(es) en esa tienda.`);
+    const productosTienda = productos.filter((p) => p.tiendaId === id).length;
+    if (productosTienda)
+      return fallo(`No se puede eliminar: hay ${productosTienda} producto(s) en esa tienda.`);
     setTiendas((prev) => prev.filter((t) => t.id !== id));
     return { ok: true };
   }
@@ -265,6 +333,7 @@ export function ProveedorDatos({ children }) {
   const valor = {
     tiendas,
     usuarios,
+    productos,
     celulares,
     movimientos,
     buscarPorImei,

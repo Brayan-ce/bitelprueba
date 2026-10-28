@@ -1,12 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useDatos } from "@/_pages/components/datos/proveedor";
 import {
   claseTipo,
   diaSemana,
+  esMercancia,
   etiquetaTipo,
-  fechaLima,
+  formatCantidad,
   formatFechaHoraMovimiento,
   formatNumero,
   formatSoles,
@@ -15,17 +17,22 @@ import { ROTULO_DATOS_DEMO } from "@/lib/datos-demo";
 import {
   IconoCelular,
   IconoEscanear,
-  IconoMasNuevo,
+  IconoInventario,
   IconoMovimientos,
 } from "@/_pages/components/ui/iconos";
 
 export default function InicioPage() {
-  const { celulares, movimientos, tiendas } = useDatos();
+  const { celulares, movimientos, tiendas, productos } = useDatos();
 
-  const hoy = fechaLima();
-  const disponibles = celulares.filter((c) => c.estado === "Disponible");
-  const vendidos = celulares.filter((c) => c.estado === "Vendido");
-  const movimientosHoy = movimientos.filter((m) => m.fecha === hoy);
+  const mercancia = productos.filter((p) => esMercancia(p.grupo));
+  const unidades = mercancia.reduce((suma, p) => suma + (Number(p.stock) || 0), 0);
+  const valorMercancia = mercancia.reduce(
+    (suma, p) => suma + (Number(p.stock) || 0) * (Number(p.costo) || 0),
+    0
+  );
+  const bajosMinimo = productos.filter(
+    (p) => p.stockMinimo > 0 && p.stock <= p.stockMinimo
+  ).length;
 
   const porImei = new Map();
   for (const celular of celulares) {
@@ -34,13 +41,16 @@ export default function InicioPage() {
   }
 
   const stock = tiendas.map((tienda) => {
-    const propios = celulares.filter((c) => c.tienda === tienda.nombre);
+    const propios = productos.filter((p) => p.tiendaId === tienda.id);
+    const propiosMercancia = propios.filter((p) => esMercancia(p.grupo));
     return {
       ...tienda,
       total: propios.length,
-      disponibles: propios.filter((c) => c.estado === "Disponible").length,
-      vendidos: propios.filter((c) => c.estado === "Vendido").length,
-      valor: propios.reduce((suma, c) => suma + (Number(c.costo) || 0), 0),
+      unidades: propiosMercancia.reduce((suma, p) => suma + (Number(p.stock) || 0), 0),
+      valor: propiosMercancia.reduce(
+        (suma, p) => suma + (Number(p.stock) || 0) * (Number(p.costo) || 0),
+        0
+      ),
     };
   });
 
@@ -51,93 +61,101 @@ export default function InicioPage() {
 
   return (
     <>
-      <div className="encabezado-pagina">
-        <div>
-          <h1 className="titulo">Inventario Pastrana</h1>
-          <p className="subtitulo" style={{ textTransform: "capitalize" }}>
-            {diaSemana()} · {formatNumero(celulares.length)} celulares en catálogo
+      <section className="hero mb-2">
+        <div className="hero-contenido">
+          <p className="hero-eyebrow">
+            Pastrana S.A.C. · Bitel y Claro
+            <span className="chip">{ROTULO_DATOS_DEMO}</span>
           </p>
+          <h1 className="hero-titulo">Inventario bajo control</h1>
+          <p className="hero-sub">
+            {diaSemana()} · {formatNumero(productos.length)} productos ·{" "}
+            {formatCantidad(unidades)} unidades en {tiendas.length} tiendas
+          </p>
+          <div className="hero-acciones">
+            <Link href="/escanear" className="btn">
+              <IconoEscanear />
+              Escanear IMEI
+            </Link>
+            <Link href="/inventario" className="btn btn-secundario">
+              <IconoInventario />
+              Ver inventario
+            </Link>
+            <Link href="/movimientos/nuevo" className="btn btn-secundario">
+              <IconoMovimientos />
+              Registrar movimiento
+            </Link>
+          </div>
         </div>
-        <span className="chip chip-brand">{ROTULO_DATOS_DEMO}</span>
-      </div>
+        <Image
+          className="hero-logo"
+          src="/logo_transparente.png"
+          alt=""
+          width={500}
+          height={500}
+          aria-hidden="true"
+        />
+      </section>
 
       <div className="rejilla rejilla-stats mb-2">
-        <div className="tarjeta stat">
+        <Link href="/inventario" className="tarjeta stat stat-enlace">
           <div className="stat-ico">
-            <IconoCelular />
+            <IconoInventario />
           </div>
-          <div className="stat-valor">{formatNumero(celulares.length)}</div>
-          <div className="stat-etiqueta">Celulares totales</div>
-        </div>
-        <div className="tarjeta stat">
+          <div className="stat-valor">{formatNumero(productos.length)}</div>
+          <div className="stat-etiqueta">Productos registrados</div>
+        </Link>
+        <Link href="/celulares" className="tarjeta stat stat-enlace">
           <div className="stat-ico" style={{ background: "var(--ok-bg)", color: "var(--ok)" }}>
             <IconoCelular />
           </div>
-          <div className="stat-valor">{formatNumero(disponibles.length)}</div>
-          <div className="stat-etiqueta">Disponibles</div>
-        </div>
-        <div className="tarjeta stat">
-          <div className="stat-ico" style={{ background: "var(--info-bg)", color: "var(--info)" }}>
-            <IconoMovimientos />
-          </div>
-          <div className="stat-valor">{formatNumero(vendidos.length)}</div>
-          <div className="stat-etiqueta">Vendidos</div>
-        </div>
-        <div className="tarjeta stat">
+          <div className="stat-valor">{formatNumero(celulares.length)}</div>
+          <div className="stat-etiqueta">Celulares con IMEI</div>
+        </Link>
+        <Link href="/inventario" className="tarjeta stat stat-enlace">
           <div className="stat-ico" style={{ background: "var(--warn-bg)", color: "var(--warn)" }}>
-            <IconoEscanear />
-          </div>
-          <div className="stat-valor">{formatNumero(movimientosHoy.length)}</div>
-          <div className="stat-etiqueta">Movimientos de hoy</div>
-        </div>
-      </div>
-
-      <div className="acciones-rapidas mb-2">
-        <Link href="/escanear" className="accion destacada">
-          <span className="accion-ico">
-            <IconoEscanear />
-          </span>
-          <span>
-            Escanear IMEI
-            <small>Cámara, foto o lectora · OK / NOK</small>
-          </span>
-        </Link>
-        <Link href="/celulares/nuevo" className="accion">
-          <span className="accion-ico">
-            <IconoMasNuevo />
-          </span>
-          <span>
-            Nuevo celular
-            <small>Registrar equipo al inventario</small>
-          </span>
-        </Link>
-        <Link href="/movimientos/nuevo" className="accion">
-          <span className="accion-ico">
             <IconoMovimientos />
-          </span>
-          <span>
-            Registrar movimiento
-            <small>Entrada, salida o traslado</small>
-          </span>
+          </div>
+          <div className="stat-valor">{formatNumero(bajosMinimo)}</div>
+          <div className="stat-etiqueta">Bajo stock mínimo</div>
         </Link>
+        <div className="tarjeta stat">
+          <div className="stat-ico">
+            <IconoInventario />
+          </div>
+          <div className="stat-valor stat-valor-chico">{formatSoles(valorMercancia)}</div>
+          <div className="stat-etiqueta">Mercadería al costo</div>
+        </div>
       </div>
 
       <div className="rejilla rejilla-2">
         <section className="tarjeta">
           <div className="tarjeta-cabeza">
             <h2 className="tarjeta-titulo">Stock por tienda</h2>
-            <Link href="/tiendas" className="vinculo texto-chico">
-              Gestionar
+            <Link href="/inventario" className="vinculo texto-chico">
+              Ver inventario
             </Link>
           </div>
-          <div>
+          <div className="lista lista-scroll">
             {stock.map((tienda) => (
               <div className="resumen-tienda" key={tienda.id}>
-                <div>
-                  <div className="resumen-tienda-nombre">{tienda.nombre}</div>
+                <div className="resumen-tienda-texto">
+                  <div className="resumen-tienda-nombre tienda-celda">
+                    <span
+                      className={`punto-operador ${
+                        tienda.operador === "Bitel"
+                          ? "punto-bitel"
+                          : tienda.operador === "Claro"
+                            ? "punto-claro"
+                            : ""
+                      }`}
+                      title={tienda.operador}
+                    />
+                    {tienda.nombre}
+                  </div>
                   <div className="resumen-tienda-meta">
-                    {tienda.disponibles} disp. · {tienda.vendidos} vendidos ·{" "}
-                    {formatSoles(tienda.valor)} en costo
+                    {formatNumero(tienda.total)} productos · {formatCantidad(tienda.unidades)}{" "}
+                    unidades · {formatSoles(tienda.valor)} al costo
                   </div>
                 </div>
                 <span className="chip chip-brand">{formatNumero(tienda.total)}</span>
@@ -154,14 +172,14 @@ export default function InicioPage() {
               Ver todos
             </Link>
           </div>
-          <div className="lista">
+          <div className="lista lista-scroll">
             {ultimos.map((movimiento) => {
               const celular = porImei.get(movimiento.imei);
               return (
                 <div className="fila" key={movimiento.id}>
                   <div className="fila-principal">
                     <span className="fila-titulo">
-                      {celular ? `${celular.marca} ${celular.modelo}` : "Celular no encontrado"}
+                      {celular ? celular.modelo : "Celular no encontrado"}
                     </span>
                     <span className={claseTipo(movimiento.tipo)}>
                       {etiquetaTipo(movimiento.tipo)}
@@ -178,8 +196,16 @@ export default function InicioPage() {
                 </div>
               );
             })}
-            {ultimos.length === 0 && <div className="vacio">Sin movimientos registrados.</div>}
+            {ultimos.length === 0 && (
+              <div className="vacio">
+                Sin movimientos todavía. El stock del Excel quedó cargado como saldo inicial.
+              </div>
+            )}
           </div>
+          <p className="nota-ayuda">
+            El stock del Excel quedó cargado como entrada inicial de cada IMEI el 25/10/2026.
+            Los movimientos nuevos aparecerán aquí.
+          </p>
         </section>
       </div>
     </>

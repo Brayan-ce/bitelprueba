@@ -59,9 +59,7 @@ export default function DetalleCelularPage({ codigo }) {
         <div className="encabezado-pagina">
           <div>
             <h1 className="titulo">Editar {celular.codigo}</h1>
-            <p className="subtitulo">
-              {celular.marca} {celular.modelo}
-            </p>
+            <p className="subtitulo">{celular.modelo}</p>
           </div>
         </div>
         <FormularioCelular
@@ -84,11 +82,9 @@ export default function DetalleCelularPage({ codigo }) {
           <Link href="/celulares" className="vinculo texto-chico">
             ← Volver al inventario
           </Link>
-          <h1 className="titulo mt-1">
-            {celular.marca} {celular.modelo}
-          </h1>
+          <h1 className="titulo mt-1">{celular.modelo}</h1>
           <p className="subtitulo">
-            <span className="mono">{celular.codigo}</span> ·{" "}
+            {celular.marca} · <span className="mono">{celular.codigo}</span> ·{" "}
             <span className={claseEstado(celular.estado)}>{celular.estado}</span>
           </p>
         </div>

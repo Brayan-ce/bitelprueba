@@ -2,19 +2,22 @@
 
 import { useState } from "react";
 import { useDatos } from "@/_pages/components/datos/proveedor";
-import { formatNumero } from "@/lib/format";
+import { OPERADORES, esMercancia, formatNumero, formatSoles } from "@/lib/format";
 import { IconoEditar, IconoPapelera } from "@/_pages/components/ui/iconos";
 
 export default function GestionTiendas() {
-  const { tiendas, celulares, agregarTienda, actualizarTienda, eliminarTienda } = useDatos();
+  const { tiendas, productos, celulares, agregarTienda, actualizarTienda, eliminarTienda } =
+    useDatos();
   const [nombre, setNombre] = useState("");
+  const [operador, setOperador] = useState("Bitel");
   const [error, setError] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [nombreEditado, setNombreEditado] = useState("");
+  const [operadorEditado, setOperadorEditado] = useState("Bitel");
 
   function crear(evento) {
     evento.preventDefault();
-    const resultado = agregarTienda({ nombre });
+    const resultado = agregarTienda({ nombre, operador });
     if (!resultado.ok) {
       setError(resultado.error);
       return;
@@ -24,7 +27,7 @@ export default function GestionTiendas() {
   }
 
   function guardarEdicion(id) {
-    const resultado = actualizarTienda(id, { nombre: nombreEditado });
+    const resultado = actualizarTienda(id, { nombre: nombreEditado, operador: operadorEditado });
     if (!resultado.ok) {
       setError(resultado.error);
       return;
@@ -49,9 +52,21 @@ export default function GestionTiendas() {
               className="input"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Nombre de la nueva tienda (ej. Ayacucho)"
+              placeholder="Nombre de la nueva tienda (ej. Bitel Ayacucho)"
               required
             />
+            <select
+              className="select"
+              value={operador}
+              onChange={(e) => setOperador(e.target.value)}
+              aria-label="Operador de la nueva tienda"
+            >
+              {OPERADORES.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
             <button type="submit" className="btn" style={{ flex: "0 0 auto" }}>
               Agregar tienda
             </button>
@@ -62,22 +77,36 @@ export default function GestionTiendas() {
       <div className="tarjeta">
         <div className="lista">
           {tiendas.map((tienda) => {
-            const propios = celulares.filter((c) => c.tienda === tienda.nombre);
-            const disponibles = propios.filter((c) => c.estado === "Disponible").length;
-            const vendidos = propios.filter((c) => c.estado === "Vendido").length;
+            const propios = productos.filter((p) => p.tiendaId === tienda.id);
+            const celularesTienda = celulares.filter((c) => c.tienda === tienda.nombre);
+            const valor = propios
+              .filter((p) => esMercancia(p.grupo))
+              .reduce((s, p) => s + p.stock * p.costo, 0);
             const editando = editandoId === tienda.id;
 
             return (
               <div className="fila" key={tienda.id}>
                 <div className="fila-principal">
                   {editando ? (
-                    <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 200 }}>
+                    <div className="tienda-edicion">
                       <input
                         className="input"
                         value={nombreEditado}
                         onChange={(e) => setNombreEditado(e.target.value)}
                         autoFocus
                       />
+                      <select
+                        className="select"
+                        value={operadorEditado}
+                        onChange={(e) => setOperadorEditado(e.target.value)}
+                        aria-label="Operador de la tienda"
+                      >
+                        {OPERADORES.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
                       <button
                         type="button"
                         className="btn btn-chico"
@@ -94,7 +123,12 @@ export default function GestionTiendas() {
                       </button>
                     </div>
                   ) : (
-                    <span className="fila-titulo">{tienda.nombre}</span>
+                    <span className="fila-titulo tienda-titulo">
+                      {tienda.nombre}
+                      <span className={tienda.operador === "Claro" ? "chip chip-info" : "chip chip-brand"}>
+                        {tienda.operador}
+                      </span>
+                    </span>
                   )}
 
                   {!editando && (
@@ -105,6 +139,7 @@ export default function GestionTiendas() {
                         onClick={() => {
                           setEditandoId(tienda.id);
                           setNombreEditado(tienda.nombre);
+                          setOperadorEditado(tienda.operador || "Bitel");
                           setError("");
                         }}
                         aria-label={`Editar ${tienda.nombre}`}
@@ -124,9 +159,9 @@ export default function GestionTiendas() {
                 </div>
 
                 <div className="fila-meta">
-                  <span>{formatNumero(propios.length)} celulares</span>
-                  <span>{disponibles} disponibles</span>
-                  <span>{vendidos} vendidos</span>
+                  <span>{formatNumero(propios.length)} productos</span>
+                  <span>{formatNumero(celularesTienda.length)} celulares</span>
+                  <span>{formatSoles(valor)} de mercadería</span>
                   <span className={tienda.activa ? "chip chip-ok" : "chip chip-muted"}>
                     {tienda.activa ? "Activa" : "Inactiva"}
                   </span>

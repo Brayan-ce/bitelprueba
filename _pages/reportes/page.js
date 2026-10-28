@@ -3,14 +3,16 @@
 import { useMemo } from "react";
 import { useDatos } from "@/_pages/components/datos/proveedor";
 import {
-  ESTADOS,
-  claseEstado,
+  GRUPOS_INVENTARIO,
+  esMercancia,
   fechaLima,
+  formatCantidad,
   formatFecha,
   formatNumero,
   formatSoles,
 } from "@/lib/format";
 import { ROTULO_DATOS_DEMO } from "@/lib/datos-demo";
+import { IconoInventario } from "@/_pages/components/ui/iconos";
 
 function Barra({ etiqueta, valor, total, sufijo }) {
   const porcentaje = total > 0 ? Math.round((valor / total) * 100) : 0;
@@ -30,16 +32,56 @@ function Barra({ etiqueta, valor, total, sufijo }) {
 }
 
 export default function ReportesPage() {
-  const { celulares, movimientos, tiendas } = useDatos();
+  const { celulares, movimientos, tiendas, productos } = useDatos();
 
-  const total = celulares.length;
-  const costoTotal = celulares.reduce((s, c) => s + (Number(c.costo) || 0), 0);
-  const precioTotal = celulares.reduce((s, c) => s + (Number(c.precio_venta) || 0), 0);
+  const mercancia = productos.filter((p) => esMercancia(p.grupo));
+  const costoTotal = mercancia.reduce((s, p) => s + p.stock * (Number(p.costo) || 0), 0);
+  const precioTotal = mercancia.reduce((s, p) => s + p.stock * (Number(p.precio) || 0), 0);
+  const unidadesTotal = mercancia.reduce((s, p) => s + (Number(p.stock) || 0), 0);
 
-  const porEstado = ESTADOS.map((estado) => ({
-    estado,
-    cantidad: celulares.filter((c) => c.estado === estado).length,
-  }));
+  const porTienda = tiendas.map((tienda) => {
+    const propios = productos.filter((p) => p.tiendaId === tienda.id);
+    const propiosMercancia = propios.filter((p) => esMercancia(p.grupo));
+    return {
+      id: tienda.id,
+      nombre: tienda.nombre,
+      operador: tienda.operador,
+      total: propios.length,
+      celulares: propios.filter((p) => p.imei).length,
+      unidades: propiosMercancia.reduce((s, p) => s + (Number(p.stock) || 0), 0),
+      bajos: propios.filter((p) => p.stockMinimo > 0 && p.stock <= p.stockMinimo).length,
+      costo: propiosMercancia.reduce((s, p) => s + p.stock * (Number(p.costo) || 0), 0),
+      precio: propiosMercancia.reduce((s, p) => s + p.stock * (Number(p.precio) || 0), 0),
+    };
+  });
+
+  const porOperador = ["Bitel", "Claro"].map((operador) => {
+    const propios = productos.filter((p) => p.operador === operador);
+    return {
+      operador,
+      cantidad: propios.length,
+      unidades: propios.reduce((s, p) => s + (Number(p.stock) || 0), 0),
+      costo: propios
+        .filter((p) => esMercancia(p.grupo))
+        .reduce((s, p) => s + p.stock * (Number(p.costo) || 0), 0),
+    };
+  });
+
+  const porGrupo = GRUPOS_INVENTARIO.map((grupo) => ({
+    grupo,
+    cantidad: productos.filter((p) => p.grupo === grupo).length,
+  })).filter((fila) => fila.cantidad > 0);
+
+  const porCategoria = useMemo(() => {
+    const mapa = new Map();
+    for (const producto of productos) {
+      mapa.set(producto.categoria, (mapa.get(producto.categoria) || 0) + 1);
+    }
+    return [...mapa.entries()]
+      .map(([categoria, cantidad]) => ({ categoria, cantidad }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 8);
+  }, [productos]);
 
   const porMarca = useMemo(() => {
     const mapa = new Map();
@@ -78,20 +120,6 @@ export default function ReportesPage() {
     return { dias: [...conteo.values()], conMovimientos, hoy };
   }, [movimientos]);
 
-  const porTienda = tiendas.map((tienda) => {
-    const propios = celulares.filter((c) => c.tienda === tienda.nombre);
-    return {
-      id: tienda.id,
-      nombre: tienda.nombre,
-      total: propios.length,
-      disponibles: propios.filter((c) => c.estado === "Disponible").length,
-      vendidos: propios.filter((c) => c.estado === "Vendido").length,
-      reparacion: propios.filter((c) => c.estado === "En reparación").length,
-      costo: propios.reduce((s, c) => s + (Number(c.costo) || 0), 0),
-      precio: propios.reduce((s, c) => s + (Number(c.precio_venta) || 0), 0),
-    };
-  });
-
   const maxMovimiento = Math.max(
     1,
     ...ultimos14.dias.map((d) => Math.max(d.entradas, d.salidas))
@@ -109,20 +137,23 @@ export default function ReportesPage() {
 
       <div className="rejilla rejilla-stats mb-2">
         <div className="tarjeta stat">
+          <div className="stat-ico">
+            <IconoInventario />
+          </div>
+          <div className="stat-valor">{formatNumero(productos.length)}</div>
+          <div className="stat-etiqueta">Productos (SKU)</div>
+        </div>
+        <div className="tarjeta stat">
           <div className="stat-valor">{formatSoles(costoTotal)}</div>
-          <div className="stat-etiqueta">Inversión en inventario (costo)</div>
+          <div className="stat-etiqueta">Mercadería al costo</div>
         </div>
         <div className="tarjeta stat">
           <div className="stat-valor">{formatSoles(precioTotal)}</div>
           <div className="stat-etiqueta">Valor a precio de venta</div>
         </div>
         <div className="tarjeta stat">
-          <div className="stat-valor">{formatSoles(precioTotal - costoTotal)}</div>
-          <div className="stat-etiqueta">Margen potencial</div>
-        </div>
-        <div className="tarjeta stat">
-          <div className="stat-valor">{formatNumero(ultimos14.conMovimientos)}</div>
-          <div className="stat-etiqueta">Movimientos (14 días)</div>
+          <div className="stat-valor">{formatCantidad(unidadesTotal)}</div>
+          <div className="stat-etiqueta">Unidades en stock</div>
         </div>
       </div>
 
@@ -131,14 +162,14 @@ export default function ReportesPage() {
           <h2 className="tarjeta-titulo">Stock por tienda</h2>
         </div>
         <div className="tabla-scroll">
-          <table className="tabla">
+          <table className="tabla tabla-ancho">
             <thead>
               <tr>
                 <th>Tienda</th>
-                <th className="num">Total</th>
-                <th className="num">Disp.</th>
-                <th className="num">Vend.</th>
-                <th className="num">Reparación</th>
+                <th className="num">Productos</th>
+                <th className="num">Celulares</th>
+                <th className="num">Unidades</th>
+                <th className="num">Bajo mínimo</th>
                 <th className="num">Costo</th>
                 <th className="num">Precio venta</th>
               </tr>
@@ -147,12 +178,26 @@ export default function ReportesPage() {
               {porTienda.map((fila) => (
                 <tr key={fila.id}>
                   <td>
-                    <strong>{fila.nombre}</strong>
+                    <span className="tienda-celda">
+                      <span
+                        className={`punto-operador ${
+                          fila.operador === "Bitel"
+                            ? "punto-bitel"
+                            : fila.operador === "Claro"
+                              ? "punto-claro"
+                              : ""
+                        }`}
+                        title={fila.operador}
+                      />
+                      <strong>{fila.nombre}</strong>
+                    </span>
                   </td>
                   <td className="num">{formatNumero(fila.total)}</td>
-                  <td className="num">{formatNumero(fila.disponibles)}</td>
-                  <td className="num">{formatNumero(fila.vendidos)}</td>
-                  <td className="num">{formatNumero(fila.reparacion)}</td>
+                  <td className="num">{formatNumero(fila.celulares)}</td>
+                  <td className="num">{formatCantidad(fila.unidades)}</td>
+                  <td className={`num${fila.bajos ? " stock-bajo" : ""}`}>
+                    {formatNumero(fila.bajos)}
+                  </td>
                   <td className="num">{formatSoles(fila.costo)}</td>
                   <td className="num">{formatSoles(fila.precio)}</td>
                 </tr>
@@ -165,38 +210,89 @@ export default function ReportesPage() {
                 </tr>
               )}
             </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td className="num">{formatNumero(productos.length)}</td>
+                <td className="num">{formatNumero(celulares.length)}</td>
+                <td className="num">{formatCantidad(unidadesTotal)}</td>
+                <td className="num">
+                  {formatNumero(
+                    productos.filter((p) => p.stockMinimo > 0 && p.stock <= p.stockMinimo).length
+                  )}
+                </td>
+                <td className="num">{formatSoles(costoTotal)}</td>
+                <td className="num">{formatSoles(precioTotal)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
+        <p className="nota-ayuda">
+          Costo y precio de venta corresponden a mercadería; no incluyen servicios (Anypay,
+          Bypay, tasas, traslados ni devoluciones).
+        </p>
       </section>
+
+      <div className="rejilla rejilla-2 mb-2">
+        <section className="tarjeta">
+          <div className="tarjeta-cabeza">
+            <h2 className="tarjeta-titulo">Por operador</h2>
+          </div>
+          <div className="tarjeta-cuerpo">
+            <div className="barras">
+              {porOperador.map((fila) => (
+                <Barra
+                  key={fila.operador}
+                  etiqueta={fila.operador}
+                  valor={fila.cantidad}
+                  total={productos.length}
+                  sufijo="SKU"
+                />
+              ))}
+            </div>
+            <p className="nota-ayuda">
+              {porOperador
+                .map((f) => `${f.operador}: ${formatCantidad(f.unidades)} unidades`)
+                .join(" · ")}
+            </p>
+          </div>
+        </section>
+
+        <section className="tarjeta">
+          <div className="tarjeta-cabeza">
+            <h2 className="tarjeta-titulo">Por grupo</h2>
+          </div>
+          <div className="tarjeta-cuerpo">
+            <div className="barras">
+              {porGrupo.map((fila) => (
+                <Barra
+                  key={fila.grupo}
+                  etiqueta={fila.grupo}
+                  valor={fila.cantidad}
+                  total={productos.length}
+                  sufijo="SKU"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
 
       <div className="rejilla rejilla-2">
         <section className="tarjeta">
           <div className="tarjeta-cabeza">
-            <h2 className="tarjeta-titulo">Por estado</h2>
-            <span className="chip chip-brand">{formatNumero(total)} en total</span>
+            <h2 className="tarjeta-titulo">Categorías con más SKU</h2>
           </div>
           <div className="tarjeta-cuerpo">
             <div className="barras">
-              {porEstado.map((fila) => (
-                <div key={fila.estado}>
-                  <div className="barra-fila">
-                    <div className="barra-etiqueta">
-                      <span className={claseEstado(fila.estado)}>{fila.estado}</span>
-                      <span>
-                        {formatNumero(fila.cantidad)} ·{" "}
-                        {total > 0 ? Math.round((fila.cantidad / total) * 100) : 0}%
-                      </span>
-                    </div>
-                    <div className="barra-rail">
-                      <div
-                        className="barra-lleno"
-                        style={{
-                          width: `${total > 0 ? (fila.cantidad / total) * 100 : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+              {porCategoria.map((fila) => (
+                <Barra
+                  key={fila.categoria}
+                  etiqueta={fila.categoria}
+                  valor={fila.cantidad}
+                  total={productos.length}
+                  sufijo="SKU"
+                />
               ))}
             </div>
           </div>
@@ -204,7 +300,8 @@ export default function ReportesPage() {
 
         <section className="tarjeta">
           <div className="tarjeta-cabeza">
-            <h2 className="tarjeta-titulo">Por marca</h2>
+            <h2 className="tarjeta-titulo">Celulares por marca</h2>
+            <span className="chip chip-brand">{formatNumero(celulares.length)} IMEI</span>
           </div>
           <div className="tarjeta-cuerpo">
             <div className="barras">
@@ -213,7 +310,7 @@ export default function ReportesPage() {
                   key={fila.marca}
                   etiqueta={fila.marca}
                   valor={fila.cantidad}
-                  total={total}
+                  total={celulares.length}
                   sufijo="und."
                 />
               ))}
